@@ -44,7 +44,8 @@ class HotswapAgentInjector : ClassTransformer {
         )
     )
 
-    println("INSTRUMENTING THE PLUGIN MANAGER")
+    clazz.getDeclaredMethod("setup").insertBefore("registerHotswapAgentPlugin();")
+
     return clazz.toBytecode()
   }
 
