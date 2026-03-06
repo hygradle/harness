@@ -1,12 +1,10 @@
-plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
-}
+plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0" }
 
 dependencyResolutionManagement {
-    repositories {
-        mavenCentral()
-        maven("https://maven.hytale.com/release")
-    }
+  repositories {
+    mavenCentral()
+    maven("https://maven.hytale.com/release")
+  }
 }
 
 rootProject.name = "harness"
