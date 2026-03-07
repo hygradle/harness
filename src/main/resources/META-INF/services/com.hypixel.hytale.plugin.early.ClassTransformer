@@ -1,0 +1,2 @@
+dev.hygradle.harness.earlyplugin.FollowSymlinkTransformer
+dev.hygradle.harness.earlyplugin.AssetStoreFollowSymlinkTransformer
