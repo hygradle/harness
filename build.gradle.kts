@@ -1,5 +1,5 @@
 plugins {
-  `java-library`
+  kotlin("jvm") version "2.3.0"
   `maven-publish`
   alias(libs.plugins.shadow)
   alias(libs.plugins.spotless)
@@ -21,7 +21,7 @@ java.toolchain {
 }
 
 spotless {
-  java { googleJavaFormat() }
+  kotlin { ktfmt() }
   kotlinGradle { ktfmt() }
 }
 
