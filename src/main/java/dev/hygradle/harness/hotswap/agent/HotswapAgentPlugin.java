@@ -19,7 +19,7 @@ import org.hotswap.agent.annotation.Plugin;
 import org.hotswap.agent.javassist.CtClass;
 import org.hotswap.agent.logging.AgentLogger;
 
-//@Plugin(name = "Hygradle", testedVersions = {"*"})
+@Plugin(name = "HygradleHarness", testedVersions = {"*"})
 public class HotswapAgentPlugin {
 
   private static final AgentLogger LOGGER = AgentLogger.getLogger(HotswapAgentPlugin.class);
