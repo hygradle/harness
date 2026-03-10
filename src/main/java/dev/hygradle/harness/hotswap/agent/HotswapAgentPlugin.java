@@ -2,16 +2,13 @@ package dev.hygradle.harness.hotswap.agent;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import org.hotswap.agent.annotation.Init;
 import org.hotswap.agent.annotation.LoadEvent;
 import org.hotswap.agent.annotation.OnClassLoadEvent;
@@ -25,18 +22,11 @@ public class HotswapAgentPlugin {
   private static final AgentLogger LOGGER = AgentLogger.getLogger(HotswapAgentPlugin.class);
   private static final int RELOAD_TIMEOUT_MS = 500;
 
-  private static final ScheduledExecutorService DEBOUNCE_EXECUTOR =
-      Executors.newSingleThreadScheduledExecutor(
-          r -> {
-            Thread t = new Thread(r, "hygradle-reload");
-            t.setDaemon(true);
-            return t;
-          });
-
   private static ClassLoader appClassLoaderRef;
   private static List<Object> classpathPluginIdentifiers;
-  private static final Map<Object, ScheduledFuture<?>> pendingReloads = new HashMap<>();
   private static ReflectionCache reflection;
+  private static SchedulerAccess schedulerAccess;
+  private static final Map<Object, Object> reloadCommands = new HashMap<>();
 
   @Init
   public static void init(ClassLoader appClassLoader) {
@@ -73,19 +63,23 @@ public class HotswapAgentPlugin {
 
       LOGGER.info("Class redefined: {}", className);
 
+      SchedulerAccess sa = getSchedulerAccess();
       for (Object pluginIdentifier : classpathPluginIdentifiers) {
-        ScheduledFuture<?> existing = pendingReloads.get(pluginIdentifier);
-        if (existing != null) {
-          existing.cancel(false);
-        }
-        pendingReloads.put(
-            pluginIdentifier,
-            DEBOUNCE_EXECUTOR.schedule(
-                () -> reloadPlugin(pluginIdentifier), RELOAD_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        Object cmd =
+            reloadCommands.computeIfAbsent(
+                pluginIdentifier, id -> sa.createCommand(() -> reloadPlugin(id)));
+        sa.scheduleCommand(cmd, RELOAD_TIMEOUT_MS);
       }
     } catch (Exception e) {
       LOGGER.debug("Failed to process class redefinition for {}: {}", className, e.getMessage());
     }
+  }
+
+  private static SchedulerAccess getSchedulerAccess() throws ReflectiveOperationException {
+    if (schedulerAccess == null) {
+      schedulerAccess = new SchedulerAccess();
+    }
+    return schedulerAccess;
   }
 
   @SuppressWarnings("unchecked")
@@ -177,6 +171,43 @@ public class HotswapAgentPlugin {
       }
     } catch (Exception e) {
       LOGGER.error("Failed to reload plugin {}", e, pluginIdentifier);
+    }
+  }
+
+  /** Accesses HotswapAgent's Scheduler and Command via reflection to avoid compile-time deps. */
+  private static class SchedulerAccess {
+    private final Object scheduler;
+    private final Method scheduleCommandMethod;
+    private final Class<?> commandInterface;
+
+    SchedulerAccess() throws ReflectiveOperationException {
+      Class<?> pmClass = Class.forName("org.hotswap.agent.config.PluginManager");
+      Object pm = pmClass.getMethod("getInstance").invoke(null);
+      scheduler = pmClass.getMethod("getScheduler").invoke(pm);
+      commandInterface = Class.forName("org.hotswap.agent.command.Command");
+      scheduleCommandMethod =
+          scheduler.getClass().getMethod("scheduleCommand", commandInterface, int.class);
+    }
+
+    void scheduleCommand(Object cmd, int timeout) throws ReflectiveOperationException {
+      scheduleCommandMethod.invoke(scheduler, cmd, timeout);
+    }
+
+    Object createCommand(Runnable action) {
+      return Proxy.newProxyInstance(
+          commandInterface.getClassLoader(),
+          new Class<?>[] {commandInterface},
+          (proxy, method, args) ->
+              switch (method.getName()) {
+                case "executeCommand" -> {
+                  action.run();
+                  yield null;
+                }
+                case "hashCode" -> System.identityHashCode(proxy);
+                case "equals" -> proxy == args[0];
+                case "toString" -> "ReloadCommand";
+                default -> null;
+              });
     }
   }
 
