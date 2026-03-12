@@ -136,7 +136,9 @@ private fun reloadPlugin(pluginIdentifier: Any) {
 }
 
 private class ReloadCommand(private val action: () -> Unit) : Command {
-  override fun executeCommand() { action() }
+  override fun executeCommand() {
+    action()
+  }
 }
 
 private class ReflectionCache(cl: ClassLoader) {

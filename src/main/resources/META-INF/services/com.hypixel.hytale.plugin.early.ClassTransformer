@@ -1,1 +1,3 @@
 dev.hygradle.harness.early.FollowSymlinkTransformer
+dev.hygradle.harness.early.PermissionsTransformer
+dev.hygradle.harness.early.PluginLoadOrderTransformer
