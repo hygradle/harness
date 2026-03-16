@@ -1,14 +1,15 @@
+@file:Suppress("UnstableApiUsage")
+
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+
 plugins {
   kotlin("jvm") version "2.3.0"
   `maven-publish`
-  signing
   alias(libs.plugins.shadow)
   alias(libs.plugins.spotless)
 }
-
-group = "dev.hygradle"
-
-version = "0.0.1"
 
 dependencies {
   compileOnly("com.hypixel.hytale:Server:2026.02.19-1a311a592")
@@ -18,17 +19,30 @@ dependencies {
 
 java {
   toolchain {
-    languageVersion.set(JavaLanguageVersion.of(25))
-    vendor.set(JvmVendorSpec.JETBRAINS)
+    languageVersion = JavaLanguageVersion.of(21)
+    vendor = JvmVendorSpec.JETBRAINS
   }
 
-  withJavadocJar()
+  sourceCompatibility = JavaVersion.VERSION_21
+  targetCompatibility = JavaVersion.VERSION_21
+
   withSourcesJar()
 }
 
+kotlin {
+  @OptIn(ExperimentalAbiValidation::class) abiValidation { enabled = true }
+  jvmToolchain(21)
+  compilerOptions {
+    allWarningsAsErrors = true
+    apiVersion = KotlinVersion.KOTLIN_2_3
+    languageVersion = apiVersion
+    jvmTarget = JvmTarget.JVM_21
+  }
+}
+
 spotless {
-  kotlin { ktfmt() }
-  kotlinGradle { ktfmt() }
+  kotlin { ktfmt(libs.versions.ktfmt.get()) }
+  kotlinGradle { ktfmt(libs.versions.ktfmt.get()) }
 }
 
 tasks.jar { enabled = false }
@@ -41,44 +55,22 @@ tasks.shadowJar {
 publishing {
   publications {
     create<MavenPublication>("shadow") {
-      groupId = "dev.hygradle"
       artifactId = "harness"
-      version = version
 
       from(components["shadow"])
-      artifact(tasks.named("javadocJar"))
       artifact(tasks.named("sourcesJar"))
-
-
-      pom {
-        name = "Hygradle Harness"
-        description = "Development harness for Hytale plugin development"
-        url = "https://hygradle.dev"
-
-        licenses {
-          license {
-            name = "MIT License"
-            url = "https://opensource.org/licenses/MIT"
-          }
-        }
-
-        developers {
-          developer {
-            id = "remi-gelinas"
-            name = "Remi Gelinas"
-          }
-        }
-
-        scm { url = "https://github.com/hygradle/harness" }
-      }
     }
   }
-}
 
-signing {
-  useInMemoryPgpKeys(
-      providers.gradleProperty("signing.secretKey").get(),
-      providers.gradleProperty("signing.keyPassword").get(),
-  )
-  sign(publishing.publications["shadow"])
+  repositories {
+    maven {
+      name = "hygradle"
+      url = uri("https://maven.hygradle.dev")
+      credentials(HttpHeaderCredentials::class) {
+        name = "Authorization"
+        value = providers.gradleProperty("hygradlePublishToken").map { "Bearer $it" }.getOrElse("")
+      }
+      authentication { create<HttpHeaderAuthentication>("header") }
+    }
+  }
 }
