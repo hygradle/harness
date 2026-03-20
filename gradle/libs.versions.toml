@@ -1,8 +1,6 @@
 [versions]
 ktfmt = "0.61"
 
-[libraries]
-
 [plugins]
 spotless = { id = "com.diffplug.spotless", version = "8.1.0" }
 shadow = { id = "com.gradleup.shadow", version = "9.4.0" }
