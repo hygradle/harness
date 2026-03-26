@@ -158,5 +158,4 @@ internal object PluginReloader {
       LOGGER.error("Failed to reload: $failed")
     }
   }
-
 }
