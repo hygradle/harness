@@ -13,6 +13,7 @@ class Hytale(private val cl: ClassLoader) {
   val pluginBase = PluginBase()
   val pluginManifest = PluginManifest()
   val pluginClassLoader = PluginClassLoader()
+  val registry = Registry()
   val assetModule = AssetModule()
   val assetStore = AssetStore()
   val assetRegistry = AssetRegistry()
@@ -108,6 +109,20 @@ class Hytale(private val cl: ClassLoader) {
 
   inner class PluginIdentifier {
     val clazz: Class<*> = cl.loadClass("com.hypixel.hytale.common.plugin.PluginIdentifier")
+  }
+
+  inner class Registry {
+    val clazz: Class<*> = cl.loadClass("com.hypixel.hytale.registry.Registry")
+
+    private val enable = clazz.getMethod("enable")
+    private val registryGetters =
+        pluginBase.clazz.methods.filter { clazz.isAssignableFrom(it.returnType) }
+
+    fun enableAll(plugin: Any) {
+      for (getter in registryGetters) {
+        enable.invoke(getter.invoke(plugin))
+      }
+    }
   }
 
   inner class AssetModule {

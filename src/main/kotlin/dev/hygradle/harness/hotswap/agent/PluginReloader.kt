@@ -81,6 +81,7 @@ internal object PluginReloader {
 
       try {
         hytale.assetStore.disableDynamicDependencies = false
+        hytale.registry.enableAll(plugin)
         hytale.pluginBase.setup0(plugin)
         setupAttempted.add(id)
       } catch (e: Exception) {
