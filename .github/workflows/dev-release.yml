@@ -1,0 +1,43 @@
+name: Dev Release
+
+on:
+  push:
+    branches: [ trunk ]
+    paths:
+      - 'src/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-release
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: github.actor != 'hygradle-helper[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@39e147cb9de83bb9910b8ef8bd7fff0ee20fcd6f # v6.0.1
+        with:
+          cache-disabled: true
+
+      - name: Publish
+        run: |
+          BASE_VERSION=$(grep '^version=' gradle.properties | cut -d'=' -f2)
+          SHORT_HASH=$(git rev-parse --short=8 HEAD)
+          VERSION="${BASE_VERSION}-${SHORT_HASH}"
+          
+          echo "Publishing version: $VERSION"
+          
+          ./gradlew publishAllPublicationsToHygradleRepository "-Pversion=$VERSION"
+        env:
+          ORG_GRADLE_PROJECT_hygradlePublishToken: ${{ secrets.HYGRADLE_PUBLISH_TOKEN }}

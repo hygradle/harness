@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release tag
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Expected a version tag (v*), got: $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@39e147cb9de83bb9910b8ef8bd7fff0ee20fcd6f # v6.0.1
+        with:
+          cache-disabled: true
+
+      - name: Publish
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ./gradlew publishAllPublicationsToHygradleRepository "-Pversion=$VERSION"
+        env:
+          ORG_GRADLE_PROJECT_hygradlePublishToken: ${{ secrets.HYGRADLE_PUBLISH_TOKEN }}
