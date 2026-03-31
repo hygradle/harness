@@ -104,7 +104,7 @@ class Hytale(private val cl: ClassLoader) {
 
     fun isInServerClasspath(loader: Any) = isInServerClasspath.invoke(loader) as Boolean
 
-    fun plugin(loader: Any): Any = plugin.get(loader)
+    fun plugin(loader: Any): Any? = plugin.get(loader)
   }
 
   inner class PluginIdentifier {

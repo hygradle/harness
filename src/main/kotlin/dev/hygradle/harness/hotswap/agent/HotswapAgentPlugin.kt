@@ -18,7 +18,6 @@ class HotswapAgentPlugin {
     val LOGGER: AgentLogger = AgentLogger.getLogger(HotswapAgentPlugin::class.java)
 
     private lateinit var appClassLoader: ClassLoader
-    private var pluginGraph: PluginGraph? = null
 
     private val scheduler
       get() = HAPluginManager.getInstance().scheduler
@@ -45,9 +44,20 @@ class HotswapAgentPlugin {
             return
           }
 
-      val graph = pluginGraph ?: PluginGraph(hytale, appClassLoader).also { pluginGraph = it }
+      val graph = PluginGraph(hytale)
 
-      val pluginId = graph.resolvePlugin(sourcePath) ?: return
+      val pluginId = graph.resolvePlugin(sourcePath)
+
+      if (pluginId == null) {
+        LOGGER.debug(
+            "Ignoring redefine for ${clazz.name} from $sourcePath; known dev plugin sources: ${graph.codeSourceMap.keys}"
+        )
+        return
+      }
+
+      LOGGER.debug(
+          "Scheduling reload for $pluginId after redefine of ${clazz.name} from $sourcePath"
+      )
 
       scheduler.scheduleCommand(
           ReloadCommand(pluginId, graph, hytale),
