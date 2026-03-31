@@ -3,7 +3,7 @@ package dev.hygradle.harness.hotswap.agent
 import java.nio.file.Path
 import org.hotswap.agent.logging.AgentLogger
 
-internal class PluginGraph(hytale: Hytale, cl: ClassLoader) {
+internal class PluginGraph(hytale: Hytale) {
   val codeSourceMap: Map<Path, Any>
   val forwardDeps: Map<Any, Set<Any>>
   val reverseDeps: Map<Any, Set<Any>>
@@ -11,33 +11,31 @@ internal class PluginGraph(hytale: Hytale, cl: ClassLoader) {
   val pluginInstances: Map<Any, Any>
 
   init {
-    val classLoaders = hytale.pluginManager.classLoaders()
+    val plugins = hytale.pluginManager.plugins()
 
-    // Discover dev plugins: non-JAR, in server classpath, non-Hytale group
+    // Discover loaded dev plugins from live instances.
     val devPlugins =
-        classLoaders.entries
-            .filter { (path, _) -> !path.toString().endsWith(".jar") }
-            .filter { (_, pcl) -> hytale.pluginClassLoader.isInServerClasspath(pcl) }
-            .mapNotNull { (_, pcl) ->
-              val plugin = hytale.pluginClassLoader.plugin(pcl)
-              val manifest = hytale.pluginBase.getManifest(plugin)
+        plugins.values.mapNotNull { plugin ->
+          val manifest = hytale.pluginBase.getManifest(plugin)
 
-              if (hytale.pluginManifest.getGroup(manifest) == "Hytale") return@mapNotNull null
+          if (hytale.pluginManifest.getGroup(manifest) == "Hytale") return@mapNotNull null
 
-              val id = hytale.pluginBase.getIdentifier(plugin)
+          val id = hytale.pluginBase.getIdentifier(plugin)
 
-              val codeSource =
-                  try {
-                    val mainClass =
-                        Class.forName(hytale.pluginManifest.getMain(manifest), false, cl)
-                    mainClass.protectionDomain.codeSource?.location?.let { Path.of(it.toURI()) }
-                  } catch (e: ClassNotFoundException) {
-                    LOGGER.debug("Could not resolve code source for plugin $id: ${e.message}")
-                    null
-                  } ?: return@mapNotNull null
+          val codeSource =
+              try {
+                plugin::class.java.protectionDomain.codeSource?.location?.let {
+                  Path.of(it.toURI())
+                }
+              } catch (e: Exception) {
+                LOGGER.debug("Could not resolve code source for plugin $id: ${e.message}")
+                null
+              } ?: return@mapNotNull null
 
-              DevPlugin(id, plugin, manifest, codeSource)
-            }
+          if (codeSource.toString().endsWith(".jar")) return@mapNotNull null
+
+          DevPlugin(id, plugin, manifest, codeSource)
+        }
 
     val devPluginIds = devPlugins.map { it.id }.toSet()
     codeSourceMap = devPlugins.associate { it.codeSource to it.id }
@@ -76,7 +74,7 @@ internal class PluginGraph(hytale: Hytale, cl: ClassLoader) {
 
     // Load order derived from PluginManager.plugins (Object2ObjectLinkedOpenHashMap,
     // insertion-ordered)
-    loadOrder = hytale.pluginManager.plugins().keys.filter { it in devPluginIds }
+    loadOrder = plugins.keys.filter { it in devPluginIds }
 
     LOGGER.debug("Built plugin graph: ${devPluginIds.size} dev plugins, load order: $loadOrder")
   }
